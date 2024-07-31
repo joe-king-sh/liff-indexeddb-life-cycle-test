@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>IndexedDB Test</title>
+    <title>Web Storage Test</title>
     <style>
       body {
         font-family: Arial, sans-serif;
@@ -14,6 +14,7 @@
       table {
         width: 100%;
         border-collapse: collapse;
+        margin-bottom: 20px;
       }
       th,
       td {
@@ -24,29 +25,69 @@
       th {
         background-color: #f2f2f2;
       }
+      .storage-type {
+        margin-top: 30px;
+      }
     </style>
   </head>
   <body>
-    <h1>IndexedDB Test</h1>
+    <h1>Web Storage Test</h1>
 
     <form id="addForm">
       <input type="text" id="keyInput" placeholder="Key" required />
       <input type="text" id="valueInput" placeholder="Value" required />
+      <select id="storageType">
+        <option value="indexedDB">IndexedDB</option>
+        <option value="localStorage">LocalStorage</option>
+        <option value="sessionStorage">SessionStorage</option>
+      </select>
       <button type="submit">登録</button>
     </form>
 
-    <button id="getDataBtn">データ取得</button>
+    <div class="storage-type">
+      <h2>IndexedDB</h2>
+      <button id="getIndexedDBBtn">データ取得</button>
+      <table id="indexedDBTable">
+        <thead>
+          <tr>
+            <th>Key</th>
+            <th>Value</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
 
-    <table id="dataTable">
-      <thead>
-        <tr>
-          <th>Key</th>
-          <th>Value</th>
-          <th>Action</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
+    <div class="storage-type">
+      <h2>LocalStorage</h2>
+      <button id="getLocalStorageBtn">データ取得</button>
+      <table id="localStorageTable">
+        <thead>
+          <tr>
+            <th>Key</th>
+            <th>Value</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="storage-type">
+      <h2>SessionStorage</h2>
+      <button id="getSessionStorageBtn">データ取得</button>
+      <table id="sessionStorageTable">
+        <thead>
+          <tr>
+            <th>Key</th>
+            <th>Value</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
 
     <script>
       let db;
@@ -78,41 +119,86 @@
         e.preventDefault();
         const key = document.getElementById("keyInput").value;
         const value = document.getElementById("valueInput").value;
+        const storageType = document.getElementById("storageType").value;
 
+        switch (storageType) {
+          case "indexedDB":
+            addToIndexedDB(key, value);
+            break;
+          case "localStorage":
+            localStorage.setItem(key, value);
+            console.log("Data added to LocalStorage successfully");
+            break;
+          case "sessionStorage":
+            sessionStorage.setItem(key, value);
+            console.log("Data added to SessionStorage successfully");
+            break;
+        }
+
+        document.getElementById("keyInput").value = "";
+        document.getElementById("valueInput").value = "";
+      });
+
+      function addToIndexedDB(key, value) {
         const transaction = db.transaction([STORE_NAME], "readwrite");
         const objectStore = transaction.objectStore(STORE_NAME);
         const request = objectStore.put({ key: key, value: value });
 
         request.onerror = (event) => {
-          console.error("Error adding data:", event.target.error);
+          console.error("Error adding data to IndexedDB:", event.target.error);
         };
 
         request.onsuccess = (event) => {
-          console.log("Data added successfully");
-          document.getElementById("keyInput").value = "";
-          document.getElementById("valueInput").value = "";
+          console.log("Data added to IndexedDB successfully");
         };
-      });
+      }
 
-      // データ取得と表示
-      document.getElementById("getDataBtn").addEventListener("click", () => {
-        const transaction = db.transaction([STORE_NAME], "readonly");
-        const objectStore = transaction.objectStore(STORE_NAME);
-        const request = objectStore.getAll();
+      // IndexedDBデータ取得と表示
+      document
+        .getElementById("getIndexedDBBtn")
+        .addEventListener("click", () => {
+          const transaction = db.transaction([STORE_NAME], "readonly");
+          const objectStore = transaction.objectStore(STORE_NAME);
+          const request = objectStore.getAll();
 
-        request.onerror = (event) => {
-          console.error("Error fetching data:", event.target.error);
-        };
+          request.onerror = (event) => {
+            console.error(
+              "Error fetching data from IndexedDB:",
+              event.target.error
+            );
+          };
 
-        request.onsuccess = (event) => {
-          const data = event.target.result;
-          displayData(data);
-        };
-      });
+          request.onsuccess = (event) => {
+            const data = event.target.result;
+            displayData(data, "indexedDBTable", deleteFromIndexedDB);
+          };
+        });
+
+      // LocalStorageデータ取得と表示
+      document
+        .getElementById("getLocalStorageBtn")
+        .addEventListener("click", () => {
+          const data = Object.entries(localStorage).map(([key, value]) => ({
+            key,
+            value,
+          }));
+          displayData(data, "localStorageTable", deleteFromLocalStorage);
+        });
+
+      // SessionStorageデータ取得と表示
+      document
+        .getElementById("getSessionStorageBtn")
+        .addEventListener("click", () => {
+          const data = Object.entries(sessionStorage).map(([key, value]) => ({
+            key,
+            value,
+          }));
+          displayData(data, "sessionStorageTable", deleteFromSessionStorage);
+        });
 
       // データ表示関数
-      function displayData(data) {
-        const tbody = document.querySelector("#dataTable tbody");
+      function displayData(data, tableId, deleteFunction) {
+        const tbody = document.querySelector(`#${tableId} tbody`);
         tbody.innerHTML = "";
 
         data.forEach((item) => {
@@ -122,25 +208,42 @@
 
           const deleteBtn = document.createElement("button");
           deleteBtn.textContent = "削除";
-          deleteBtn.onclick = () => deleteItem(item.key);
+          deleteBtn.onclick = () => deleteFunction(item.key);
           row.insertCell(2).appendChild(deleteBtn);
         });
       }
 
-      // データ削除関数
-      function deleteItem(key) {
+      // IndexedDBデータ削除関数
+      function deleteFromIndexedDB(key) {
         const transaction = db.transaction([STORE_NAME], "readwrite");
         const objectStore = transaction.objectStore(STORE_NAME);
         const request = objectStore.delete(key);
 
         request.onerror = (event) => {
-          console.error("Error deleting data:", event.target.error);
+          console.error(
+            "Error deleting data from IndexedDB:",
+            event.target.error
+          );
         };
 
         request.onsuccess = (event) => {
-          console.log("Data deleted successfully");
-          document.getElementById("getDataBtn").click(); // 表示を更新
+          console.log("Data deleted from IndexedDB successfully");
+          document.getElementById("getIndexedDBBtn").click();
         };
+      }
+
+      // LocalStorageデータ削除関数
+      function deleteFromLocalStorage(key) {
+        localStorage.removeItem(key);
+        console.log("Data deleted from LocalStorage successfully");
+        document.getElementById("getLocalStorageBtn").click();
+      }
+
+      // SessionStorageデータ削除関数
+      function deleteFromSessionStorage(key) {
+        sessionStorage.removeItem(key);
+        console.log("Data deleted from SessionStorage successfully");
+        document.getElementById("getSessionStorageBtn").click();
       }
     </script>
   </body>
