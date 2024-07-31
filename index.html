@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>IndexedDB Test</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th,
+      td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: left;
+      }
+      th {
+        background-color: #f2f2f2;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>IndexedDB Test</h1>
+
+    <form id="addForm">
+      <input type="text" id="keyInput" placeholder="Key" required />
+      <input type="text" id="valueInput" placeholder="Value" required />
+      <button type="submit">登録</button>
+    </form>
+
+    <button id="getDataBtn">データ取得</button>
+
+    <table id="dataTable">
+      <thead>
+        <tr>
+          <th>Key</th>
+          <th>Value</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <script>
+      let db;
+      const DB_NAME = "TestDB";
+      const STORE_NAME = "TestStore";
+
+      // IndexedDBを開く
+      const request = indexedDB.open(DB_NAME, 1);
+
+      request.onerror = (event) => {
+        console.error("IndexedDB error:", event.target.error);
+      };
+
+      request.onsuccess = (event) => {
+        db = event.target.result;
+        console.log("IndexedDB opened successfully");
+      };
+
+      request.onupgradeneeded = (event) => {
+        db = event.target.result;
+        const objectStore = db.createObjectStore(STORE_NAME, {
+          keyPath: "key",
+        });
+        console.log("Object store created");
+      };
+
+      // データ追加
+      document.getElementById("addForm").addEventListener("submit", (e) => {
+        e.preventDefault();
+        const key = document.getElementById("keyInput").value;
+        const value = document.getElementById("valueInput").value;
+
+        const transaction = db.transaction([STORE_NAME], "readwrite");
+        const objectStore = transaction.objectStore(STORE_NAME);
+        const request = objectStore.put({ key: key, value: value });
+
+        request.onerror = (event) => {
+          console.error("Error adding data:", event.target.error);
+        };
+
+        request.onsuccess = (event) => {
+          console.log("Data added successfully");
+          document.getElementById("keyInput").value = "";
+          document.getElementById("valueInput").value = "";
+        };
+      });
+
+      // データ取得と表示
+      document.getElementById("getDataBtn").addEventListener("click", () => {
+        const transaction = db.transaction([STORE_NAME], "readonly");
+        const objectStore = transaction.objectStore(STORE_NAME);
+        const request = objectStore.getAll();
+
+        request.onerror = (event) => {
+          console.error("Error fetching data:", event.target.error);
+        };
+
+        request.onsuccess = (event) => {
+          const data = event.target.result;
+          displayData(data);
+        };
+      });
+
+      // データ表示関数
+      function displayData(data) {
+        const tbody = document.querySelector("#dataTable tbody");
+        tbody.innerHTML = "";
+
+        data.forEach((item) => {
+          const row = tbody.insertRow();
+          row.insertCell(0).textContent = item.key;
+          row.insertCell(1).textContent = item.value;
+
+          const deleteBtn = document.createElement("button");
+          deleteBtn.textContent = "削除";
+          deleteBtn.onclick = () => deleteItem(item.key);
+          row.insertCell(2).appendChild(deleteBtn);
+        });
+      }
+
+      // データ削除関数
+      function deleteItem(key) {
+        const transaction = db.transaction([STORE_NAME], "readwrite");
+        const objectStore = transaction.objectStore(STORE_NAME);
+        const request = objectStore.delete(key);
+
+        request.onerror = (event) => {
+          console.error("Error deleting data:", event.target.error);
+        };
+
+        request.onsuccess = (event) => {
+          console.log("Data deleted successfully");
+          document.getElementById("getDataBtn").click(); // 表示を更新
+        };
+      }
+    </script>
+  </body>
+</html>
